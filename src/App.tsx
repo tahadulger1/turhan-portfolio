@@ -92,13 +92,13 @@ const MultiProjectCard: React.FC<{ project: Project; onImageClick?: (url: string
 
         {/* Variation Dots */}
         {project.variations.length > 1 && (
-          <div className="absolute bottom-6 left-6 flex items-center gap-3 z-10 bg-black/40 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg">
-            <span className="text-xs font-medium text-white/90 mr-1 select-none">Logo renk çeşitleri:</span>
+          <div className="absolute top-1/2 -translate-y-1/2 left-3 md:top-auto md:translate-y-0 md:bottom-6 md:left-6 flex flex-col md:flex-row items-center gap-2.5 md:gap-3 z-10 bg-black/40 backdrop-blur-md px-2.5 py-3.5 md:px-4 md:py-2.5 rounded-full md:rounded-2xl border border-white/10 shadow-lg">
+            <span className="hidden md:block text-xs font-medium text-white/90 mr-1 select-none whitespace-nowrap">Logo renk çeşitleri:</span>
             {project.variations.map((variation, idx) => (
               <button
                 key={variation.id || idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`w-5 h-5 rounded-full transition-all duration-300 border-2 ${currentIndex === idx ? 'scale-125 border-white' : 'border-transparent opacity-70 hover:opacity-100'
+                onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                className={`w-5 h-5 md:w-5 md:h-5 rounded-full transition-all duration-300 border-2 flex-shrink-0 ${currentIndex === idx ? 'scale-125 border-white' : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 style={{ backgroundColor: variation.colorCode || '#ccc' }}
                 aria-label={`View variation ${idx + 1}`}
@@ -109,17 +109,17 @@ const MultiProjectCard: React.FC<{ project: Project; onImageClick?: (url: string
 
         {/* Background Toggle Dots */}
         {project.category?.toLowerCase() !== 'video' && (
-          <div className="absolute bottom-6 right-6 flex items-center gap-2 z-10 bg-black/40 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg">
-            <span className="text-xs font-medium text-white/90 mr-2 select-none">Arkaplan:</span>
+          <div className="absolute top-1/2 -translate-y-1/2 right-3 md:top-auto md:translate-y-0 md:bottom-6 md:left-auto md:right-6 flex flex-col md:flex-row items-center gap-2.5 md:gap-2 z-10 bg-black/40 backdrop-blur-md px-2.5 py-3.5 md:px-4 md:py-2.5 rounded-full md:rounded-2xl border border-white/10 shadow-lg">
+            <span className="hidden md:block text-xs font-medium text-white/90 mr-2 select-none whitespace-nowrap">Arkaplan:</span>
             <button
               onClick={(e) => { e.stopPropagation(); setBgPreview('black'); }}
-              className={`w-5 h-5 rounded-full transition-all duration-300 border-2 bg-black ${bgPreview === 'black' ? 'scale-125 border-white' : 'border-gray-500 opacity-70 hover:opacity-100'
+              className={`w-5 h-5 rounded-full transition-all duration-300 border-2 bg-black flex-shrink-0 ${bgPreview === 'black' ? 'scale-125 border-white' : 'border-gray-500 opacity-70 hover:opacity-100'
                 }`}
               aria-label="Siyah Arkaplan"
             />
             <button
               onClick={(e) => { e.stopPropagation(); setBgPreview('white'); }}
-              className={`w-5 h-5 rounded-full transition-all duration-300 border-[1.5px] bg-white ${bgPreview === 'white' ? 'scale-125 border-white' : 'border-gray-300 opacity-70 hover:opacity-100'
+              className={`w-5 h-5 rounded-full transition-all duration-300 border-[1.5px] bg-white flex-shrink-0 ${bgPreview === 'white' ? 'scale-125 border-white' : 'border-gray-300 opacity-70 hover:opacity-100'
                 }`}
               aria-label="Beyaz Arkaplan"
             />
@@ -331,7 +331,7 @@ export default function App() {
           >
             <h2 className="font-display text-4xl md:text-6xl font-bold tracking-tight mb-4 text-primary">Portfolyo</h2>
             <p className="text-xl text-secondary max-w-2xl">
-              Logo, afiş, poster ve illüstrasyon çalışmalarım. Varyasyonları görmek veya arkaplanı değiştirmek için sağ alt köşedeki noktalara tıklayabilirsiniz.
+              Logo, afiş, poster ve illüstrasyon çalışmalarım. Varyasyonları görmek veya arkaplanı değiştirmek için köşedeki noktalara tıklayabilirsiniz.
             </p>
           </motion.div>
 
