@@ -74,7 +74,10 @@ app.post('/api/upload', requireAuth, (req, res) => {
                     upsert: false
                 });
 
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase Storage Error:", error);
+                throw error;
+            }
 
             // Get public URL
             const { data: publicData } = supabase
@@ -84,8 +87,8 @@ app.post('/api/upload', requireAuth, (req, res) => {
 
             res.json({ success: true, url: publicData.publicUrl });
         } catch (uploadError: any) {
-            console.error("Upload error:", uploadError);
-            res.status(500).json({ error: 'Dosya yüklenirken bir hata oluştu.' });
+            console.error("Upload Catch Error:", uploadError);
+            res.status(500).json({ error: uploadError.message || 'Dosya yüklenirken bir hata oluştu.' });
         }
     });
 });
