@@ -10,11 +10,11 @@ const app = express();
 const storage = multer.memoryStorage();
 
 const fileFilter = (req: any, file: any, cb: any) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/webm'];
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Sadece resim dosyaları yüklenebilir.'), false);
+        cb(new Error('Desteklenmeyen dosya formatı. (Sadece resim ve mp4/webm videolar)'), false);
     }
 };
 
@@ -123,13 +123,13 @@ app.get('/api/projects', async (req, res) => {
 
 app.post('/api/projects', requireAuth, async (req, res) => {
     try {
-        const { title, category, description, isMulti, variations } = req.body;
+        const { title, category, description, isMulti, variations, defaultBgColor } = req.body;
 
         // Insert project
         const { data: projectData, error: projectError } = await supabase
             .from('projects')
             .insert([
-                { title, category, description: description || '', isMulti: isMulti ? true : false }
+                { title, category, description: description || '', isMulti: isMulti ? true : false, defaultBgColor: defaultBgColor || 'default' }
             ])
             .select()
             .single();
@@ -139,10 +139,11 @@ app.post('/api/projects', requireAuth, async (req, res) => {
 
         // Insert variations if any
         if (variations && Array.isArray(variations) && variations.length > 0) {
-            const variationInserts = variations.map(v => ({
+            const variationInserts = variations.map((v: any) => ({
                 projectId: projectId,
                 image: v.image,
-                colorCode: v.colorCode || ''
+                colorCode: v.colorCode || '',
+                imageScale: v.imageScale !== undefined ? v.imageScale : 1
             }));
 
             const { error: variationError } = await supabase
@@ -162,12 +163,12 @@ app.post('/api/projects', requireAuth, async (req, res) => {
 app.put('/api/projects/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, category, description, isMulti, variations } = req.body;
+        const { title, category, description, isMulti, variations, defaultBgColor } = req.body;
 
         // Update project
         const { error: projectError } = await supabase
             .from('projects')
-            .update({ title, category, description: description || '', isMulti: isMulti ? true : false })
+            .update({ title, category, description: description || '', isMulti: isMulti ? true : false, defaultBgColor: defaultBgColor || 'default' })
             .eq('id', id);
 
         if (projectError) throw projectError;
@@ -182,10 +183,11 @@ app.put('/api/projects/:id', requireAuth, async (req, res) => {
 
         // Insert new variations
         if (variations && Array.isArray(variations) && variations.length > 0) {
-            const variationInserts = variations.map(v => ({
+            const variationInserts = variations.map((v: any) => ({
                 projectId: id,
                 image: v.image,
-                colorCode: v.colorCode || ''
+                colorCode: v.colorCode || '',
+                imageScale: v.imageScale !== undefined ? v.imageScale : 1
             }));
 
             const { error: variationError } = await supabase
@@ -220,6 +222,61 @@ app.delete('/api/projects/:id', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to delete project' });
+    }
+});
+
+// Kategoriler API
+
+app.get('/api/categories', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('categories')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+
+app.post('/api/categories', requireAuth, async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name) return res.status(400).json({ error: 'Category name is required' });
+
+        const { data, error } = await supabase
+            .from('categories')
+            .insert([{ name }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (error: any) {
+        console.error(error);
+        if (error.code === '23505') { // Unique violation
+            return res.status(400).json({ error: 'Bu kategori zaten mevcut.' });
+        }
+        res.status(500).json({ error: 'Failed to create category' });
+    }
+});
+
+app.delete('/api/categories/:id', requireAuth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabase
+            .from('categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete category' });
     }
 });
 

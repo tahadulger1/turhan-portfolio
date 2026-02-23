@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Linkedin, Mail, ExternalLink, Moon, Sun, ChevronDown, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 type ProjectVariation = {
   id: number;
   image: string;
   colorCode?: string;
+  imageScale?: number;
 };
 
 type Project = {
@@ -16,39 +18,82 @@ type Project = {
   variations: ProjectVariation[];
   description?: string;
   isMulti: boolean;
+  defaultBgColor?: 'default' | 'black' | 'white';
+};
+
+const isVideo = (url?: string) => {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg)$/i.test(url);
 };
 
 const MultiProjectCard: React.FC<{ project: Project; onImageClick?: (url: string) => void }> = ({ project, onImageClick }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [bgPreview, setBgPreview] = useState<'default' | 'black' | 'white'>(project.defaultBgColor || 'default');
+
+  const getBgClass = () => {
+    if (bgPreview === 'black') return 'bg-black';
+    if (bgPreview === 'white') return 'bg-white';
+    return 'bg-secondary';
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 15 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.6 }}
+      viewport={{ once: true, margin: "0px" }}
+      transition={{ duration: 0.3 }}
       className="card-bg rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 flex flex-col group"
     >
       {/* Image Container */}
-      <div className="relative aspect-[4/3] md:aspect-[16/9] overflow-hidden bg-secondary">
+      <div className={`relative aspect-[4/3] md:aspect-[16/9] overflow-hidden transition-colors duration-300 ${getBgClass()}`}>
         <AnimatePresence mode="wait">
-          <motion.img
+          <motion.div
             key={currentIndex}
-            src={project.variations[currentIndex]?.image}
-            alt={`${project.title} variation ${currentIndex + 1}`}
-            initial={{ opacity: 0, scale: 1.05 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className={`w-full h-full object-contain p-2 md:p-4 transition-transform ${onImageClick ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
-            referrerPolicy="no-referrer"
+            transition={{ duration: 0.2 }}
+            className={`w-full h-full flex items-center justify-center p-2 md:p-4 group/img transition-transform ${onImageClick ? 'cursor-pointer' : ''}`}
             onClick={() => onImageClick && onImageClick(project.variations[currentIndex]?.image)}
-          />
+            onMouseEnter={(e) => {
+              const video = e.currentTarget.querySelector('video');
+              if (video) {
+                video.currentTime = 0;
+                video.play().catch(() => { });
+              }
+            }}
+            onMouseLeave={(e) => {
+              const video = e.currentTarget.querySelector('video');
+              if (video) {
+                video.pause();
+              }
+            }}
+          >
+            {isVideo(project.variations[currentIndex]?.image) ? (
+              <video
+                src={project.variations[currentIndex]?.image}
+                className={`w-full h-full object-contain transition-transform duration-300 ${onImageClick ? 'group-hover/img:scale-[1.03]' : ''}`}
+                autoPlay
+                muted
+                playsInline
+                style={{ transform: `scale(${project.variations[currentIndex]?.imageScale || 1})` }}
+              />
+            ) : (
+              <img
+                src={project.variations[currentIndex]?.image}
+                alt={`${project.title} variation ${currentIndex + 1}`}
+                style={{ transform: `scale(${project.variations[currentIndex]?.imageScale || 1})` }}
+                className={`w-full h-full object-contain transition-transform duration-300 ${onImageClick ? 'group-hover/img:scale-[1.03]' : ''}`}
+                referrerPolicy="no-referrer"
+              />
+            )}
+          </motion.div>
         </AnimatePresence>
 
         {/* Variation Dots */}
         {project.variations.length > 1 && (
-          <div className="absolute bottom-6 left-6 flex gap-3 z-10 bg-black/20 backdrop-blur-md p-2 rounded-full">
+          <div className="absolute bottom-6 left-6 flex items-center gap-3 z-10 bg-black/40 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg">
+            <span className="text-xs font-medium text-white/90 mr-1 select-none">Logo renk çeşitleri:</span>
             {project.variations.map((variation, idx) => (
               <button
                 key={variation.id || idx}
@@ -59,6 +104,25 @@ const MultiProjectCard: React.FC<{ project: Project; onImageClick?: (url: string
                 aria-label={`View variation ${idx + 1}`}
               />
             ))}
+          </div>
+        )}
+
+        {/* Background Toggle Dots */}
+        {project.category?.toLowerCase() !== 'video' && (
+          <div className="absolute bottom-6 right-6 flex items-center gap-2 z-10 bg-black/40 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shadow-lg">
+            <span className="text-xs font-medium text-white/90 mr-2 select-none">Arkaplan:</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setBgPreview('black'); }}
+              className={`w-5 h-5 rounded-full transition-all duration-300 border-2 bg-black ${bgPreview === 'black' ? 'scale-125 border-white' : 'border-gray-500 opacity-70 hover:opacity-100'
+                }`}
+              aria-label="Siyah Arkaplan"
+            />
+            <button
+              onClick={(e) => { e.stopPropagation(); setBgPreview('white'); }}
+              className={`w-5 h-5 rounded-full transition-all duration-300 border-[1.5px] bg-white ${bgPreview === 'white' ? 'scale-125 border-white' : 'border-gray-300 opacity-70 hover:opacity-100'
+                }`}
+              aria-label="Beyaz Arkaplan"
+            />
           </div>
         )}
       </div>
@@ -86,42 +150,13 @@ const MultiProjectCard: React.FC<{ project: Project; onImageClick?: (url: string
   );
 }
 
-const SingleProjectCard: React.FC<{ project: Project; onImageClick?: (url: string) => void }> = ({ project, onImageClick }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{ duration: 0.5 }}
-      className="card-bg rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 group"
-    >
-      <div className="aspect-square overflow-hidden bg-secondary">
-        <img
-          src={project.variations[0]?.image}
-          alt={project.title}
-          className={`w-full h-full object-contain p-2 md:p-4 transition-transform duration-700 ${onImageClick ? 'cursor-pointer group-hover:scale-[1.03]' : 'group-hover:scale-[1.03]'}`}
-          referrerPolicy="no-referrer"
-          onClick={() => onImageClick && onImageClick(project.variations[0]?.image)}
-        />
-      </div>
-      <div className="p-6">
-        <span className="text-xs font-semibold tracking-wider uppercase text-secondary mb-1 block">
-          {project.category}
-        </span>
-        <h3 className="text-lg font-display font-bold text-primary">
-          {project.title}
-        </h3>
-      </div>
-    </motion.div>
-  );
-}
 
 const LoadingScreen = () => {
   return (
     <motion.div
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.8, ease: "easeInOut" }}
+      transition={{ duration: 0.6, ease: "easeInOut" }}
       className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#050505] text-white"
     >
       <div className="relative flex flex-col items-center">
@@ -138,8 +173,8 @@ const LoadingScreen = () => {
                 visible: { y: 0, opacity: 1 }
               }}
               transition={{
-                duration: 0.8,
-                delay: index * 0.05,
+                duration: 0.4,
+                delay: index * 0.02,
                 ease: [0.33, 1, 0.68, 1]
               }}
               className={`font-display text-4xl md:text-6xl font-bold tracking-tighter ${char === " " ? "mr-4" : ""}`}
@@ -152,14 +187,14 @@ const LoadingScreen = () => {
         <motion.div
           initial={{ width: 0, opacity: 0 }}
           animate={{ width: "100%", opacity: 1 }}
-          transition={{ duration: 1, delay: 0.8, ease: "easeInOut" }}
+          transition={{ duration: 0.5, delay: 0.4, ease: "easeInOut" }}
           className="h-[2px] bg-purple-600 mt-4 shadow-[0_0_15px_rgba(139,92,246,0.6)]"
         />
 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 1, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           className="mt-8 text-xs tracking-[0.3em] uppercase text-gray-500 font-medium"
         >
           Portfolyo Yükleniyor
@@ -187,12 +222,17 @@ export default function App() {
     try {
       const res = await fetch('/api/projects');
       const data = await res.json();
-      setProjects(data);
+      if (Array.isArray(data)) {
+        setProjects(data);
+      } else {
+        console.error('Projeler alınırken hata:', data);
+        setProjects([]);
+      }
     } catch (error) {
       console.error('Failed to fetch projects', error);
     } finally {
-      // Yapay bir bekleme ekleyelim ki loading ekranı kullanıcıya bir anlık görünmesin, tadını çıkarsın
-      setTimeout(() => setLoading(false), 2000);
+      // Bekleme ekranını daha kısa tutuyoruz (yaklaşık 0.8 sn)
+      setTimeout(() => setLoading(false), 800);
     }
   };
 
@@ -206,14 +246,21 @@ export default function App() {
 
   const toggleTheme = () => setIsDark(!isDark);
 
-  const multiProjects = projects.filter(p => p.isMulti);
-  const singleProjects = projects.filter(p => !p.isMulti);
-
   return (
     <div className="min-h-screen">
       <AnimatePresence>
         {loading && <LoadingScreen key="loader" />}
       </AnimatePresence>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#222',
+            color: '#fff',
+            borderRadius: '12px',
+          }
+        }}
+      />
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 glass-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -273,8 +320,8 @@ export default function App() {
         </motion.div>
       </section>
 
-      {/* Portfolio Section - Multi Variations */}
-      {multiProjects.length > 0 && (
+      {/* Portfolio Section */}
+      {projects.length > 0 && (
         <section id="portfolio" className="py-24 px-6 max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -282,38 +329,15 @@ export default function App() {
             viewport={{ once: true }}
             className="mb-16 md:mb-24"
           >
-            <h2 className="font-display text-4xl md:text-6xl font-bold tracking-tight mb-4 text-primary">Marka Kimlikleri</h2>
+            <h2 className="font-display text-4xl md:text-6xl font-bold tracking-tight mb-4 text-primary">Portfolyo</h2>
             <p className="text-xl text-secondary max-w-2xl">
-              Farklı zemin ve kullanım alanlarına göre uyarlanmış, çoklu renk varyasyonlarına sahip detaylı logo ve kurumsal kimlik çalışmaları. Renkleri görmek için noktalara tıklayın.
+              Logo, afiş, poster ve illüstrasyon çalışmalarım. Varyasyonları görmek veya arkaplanı değiştirmek için sağ alt köşedeki noktalara tıklayabilirsiniz.
             </p>
           </motion.div>
 
-          <div className="flex flex-col gap-16 md:gap-24">
-            {multiProjects.map((project) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+            {projects.map((project) => (
               <MultiProjectCard key={project.id} project={project} onImageClick={setSelectedImage} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Portfolio Section - Single Variations */}
-      {singleProjects.length > 0 && (
-        <section className={`py-24 px-6 max-w-7xl mx-auto ${multiProjects.length > 0 ? 'border-t border-custom' : ''}`}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-16"
-          >
-            <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight mb-4 text-primary">Diğer Tasarımlar</h2>
-            <p className="text-lg text-secondary max-w-2xl">
-              Afişler, illüstrasyonlar ve tekil logo konseptleri.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {singleProjects.map((project) => (
-              <SingleProjectCard key={project.id} project={project} onImageClick={setSelectedImage} />
             ))}
           </div>
         </section>
@@ -335,16 +359,30 @@ export default function App() {
             >
               <X size={24} />
             </button>
-            <motion.img
-              src={selectedImage}
-              alt="Büyütülmüş Görsel"
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-default"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}
-            />
+            {isVideo(selectedImage) ? (
+              <motion.video
+                src={selectedImage!}
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-default"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                controls
+                autoPlay
+                onClick={(e: any) => e.stopPropagation()}
+              />
+            ) : (
+              <motion.img
+                src={selectedImage!}
+                alt="Büyütülmüş Görsel"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-default"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                onClick={(e: any) => e.stopPropagation()}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

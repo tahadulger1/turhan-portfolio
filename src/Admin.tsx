@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Image as ImageIcon, Lock, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Image as ImageIcon, Lock, Eye, EyeOff, Crop } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Cropper from 'react-easy-crop';
+import getCroppedImg from './utils/cropImage';
+import toast, { Toaster } from 'react-hot-toast';
 
 type ProjectVariation = {
   id?: number;
   image: string;
   colorCode?: string;
+  imageScale?: number;
 };
 
 type Project = {
@@ -14,33 +18,103 @@ type Project = {
   category: string;
   description?: string;
   isMulti: boolean;
+  defaultBgColor?: 'default' | 'black' | 'white';
   variations: ProjectVariation[];
 };
 
 export default function Admin() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [categories, setCategories] = useState<{ id: number, name: string }[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [token, setToken] = useState<string | null>(localStorage.getItem('adminToken'));
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [statusMessage, setStatusMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(localStorage.getItem('rememberMe') === 'true');
 
+  // Cropper states
+  const [cropFileUrl, setCropFileUrl] = useState<string | null>(null);
+  const [cropVarIndex, setCropVarIndex] = useState<number | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const showStatus = (text: string, type: 'success' | 'error') => {
-    setStatusMessage({ text, type });
-    setTimeout(() => setStatusMessage(null), 3000);
+    if (type === 'success') {
+      toast.success(text);
+    } else {
+      toast.error(text);
+    }
   };
 
   useEffect(() => {
     if (token) {
       fetchProjects();
+      fetchCategories();
     } else {
       setLoading(false);
     }
   }, [token]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setCategories(data);
+      } else {
+        console.error('Kategoriler alınırken hata:', data);
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Kategoriler alınamadı', error);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim() || !token) return;
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({ name: newCategoryName.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNewCategoryName('');
+        fetchCategories();
+        showStatus('Kategori eklendi', 'success');
+      } else {
+        showStatus(data.error || 'Eklenemedi', 'error');
+      }
+    } catch (e) {
+      showStatus('Hata oluştu', 'error');
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!token || !confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`/api/categories/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': token }
+      });
+      if (res.ok) {
+        fetchCategories();
+        showStatus('Kategori silindi', 'success');
+      }
+    } catch (e) {
+      showStatus('Hata oluştu', 'error');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +147,12 @@ export default function Admin() {
     try {
       const res = await fetch('/api/projects');
       const data = await res.json();
-      setProjects(data);
+      if (Array.isArray(data)) {
+        setProjects(data);
+      } else {
+        console.error('Projeler alınırken hata:', data);
+        setProjects([]);
+      }
     } catch (error) {
       console.error('Failed to fetch projects', error);
     } finally {
@@ -146,43 +225,115 @@ export default function Admin() {
       category: '',
       description: '',
       isMulti: false,
-      variations: [{ image: '', colorCode: '' }]
+      defaultBgColor: 'default',
+      variations: [{ image: '', colorCode: '', imageScale: 1 }]
     });
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, varIndex: number) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, varIndex: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!token) return;
+      if (file.type.startsWith('video/')) {
+        uploadVideoDirectly(file, varIndex);
+      } else {
+        const url = URL.createObjectURL(file);
+        setCropFileUrl(url);
+        setCropVarIndex(varIndex);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+      }
+    }
+    // clear input
+    e.target.value = '';
+  };
+
+  const uploadVideoDirectly = async (file: File, varIndex: number) => {
+    if (!token || !editForm) return;
+    const toastId = toast.loading('Medya yükleniyor... Lütfen bekleyin.');
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file); // Use same field name
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Authorization': token },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (res.status === 401) {
+        handleLogout();
+        setIsUploading(false);
+        toast.dismiss(toastId);
+        return;
+      }
+
+      if (data.success) {
+        const newVariations = [...editForm.variations];
+        newVariations[varIndex].image = data.url;
+        newVariations[varIndex].imageScale = 1;
+        setEditForm({ ...editForm, variations: newVariations });
+        toast.success('Video başarıyla yüklendi', { id: toastId });
+      } else {
+        toast.error(data.error || 'Video yüklenemedi', { id: toastId });
+      }
+    } catch (e) {
+      toast.error('Yükleme hatası', { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (!cropFileUrl || cropVarIndex === null || !croppedAreaPixels || !token || !editForm) return;
+
+    const toastId = toast.loading('Görsel kırpılıp yükleniyor...');
+    setIsUploading(true);
+    try {
+      const croppedImageBlob = await getCroppedImg(cropFileUrl, croppedAreaPixels);
+      if (!croppedImageBlob) throw new Error('Blob is null');
 
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', croppedImageBlob, 'cropped.png');
 
-      try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Authorization': token },
-          body: formData
-        });
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Authorization': token },
+        body: formData
+      });
 
-        const data = await res.json();
-        if (res.status === 401) {
-          handleLogout();
-          return;
-        }
-
-        if (data.success && editForm) {
-          const newVariations = [...editForm.variations];
-          newVariations[varIndex].image = data.url;
-          setEditForm({ ...editForm, variations: newVariations });
-          showStatus('Görsel başarıyla yüklendi', 'success');
-        } else {
-          showStatus(data.error || 'Görsel yüklenemedi', 'error');
-        }
-      } catch (error) {
-        console.error('Upload error:', error);
-        showStatus('Görsel yükleme hatası', 'error');
+      const data = await res.json();
+      if (res.status === 401) {
+        handleLogout();
+        setIsUploading(false);
+        toast.dismiss(toastId);
+        return;
       }
+
+      if (data.success) {
+        const newVariations = [...editForm.variations];
+        newVariations[cropVarIndex].image = data.url;
+        // set image scale to 1 because we already cropped & scaled it
+        newVariations[cropVarIndex].imageScale = 1;
+        setEditForm({ ...editForm, variations: newVariations });
+        toast.success('Görsel başarıyla yüklenip kırpıldı', { id: toastId });
+
+        // Cleanup
+        setCropFileUrl(null);
+        setCropVarIndex(null);
+      } else {
+        toast.error(data.error || 'Görsel yüklenemedi', { id: toastId });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Kırpma ve yükleme hatası', { id: toastId });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -252,12 +403,17 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-8">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#222',
+            color: '#fff',
+            borderRadius: '12px',
+          }
+        }}
+      />
       <div className="max-w-6xl mx-auto">
-        {statusMessage && (
-          <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg border ${statusMessage.type === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-red-500/20 border-red-500/50 text-red-400'}`}>
-            {statusMessage.text}
-          </div>
-        )}
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold font-display">Portfolyo Yönetimi</h1>
@@ -265,6 +421,12 @@ export default function Admin() {
             <Link to="/" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm">
               Siteye Dön
             </Link>
+            <button
+              onClick={() => setShowCategoryModal(true)}
+              className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors text-sm"
+            >
+              Kategoriler
+            </button>
             <button
               onClick={handleLogout}
               className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm"
@@ -301,12 +463,16 @@ export default function Admin() {
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Kategori</label>
-                <input
-                  type="text"
+                <select
                   value={editForm.category}
                   onChange={e => setEditForm({ ...editForm, category: e.target.value })}
                   className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
-                />
+                >
+                  <option value="" disabled>Seçiniz</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm text-gray-400 mb-2">Açıklama</label>
@@ -316,15 +482,29 @@ export default function Admin() {
                   className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 h-24"
                 />
               </div>
-              <div className="md:col-span-2 flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isMulti"
-                  checked={editForm.isMulti}
-                  onChange={e => setEditForm({ ...editForm, isMulti: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-600"
-                />
-                <label htmlFor="isMulti" className="text-sm text-gray-300">Bu proje çoklu varyasyona sahip (Renk seçenekli vb.)</label>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 items-center border-t border-white/10 pt-4 mt-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="isMulti"
+                    checked={editForm.isMulti}
+                    onChange={e => setEditForm({ ...editForm, isMulti: e.target.checked })}
+                    className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-600"
+                  />
+                  <label htmlFor="isMulti" className="text-sm text-gray-300">Bu proje çoklu varyasyona sahip (Renk seçenekli vb.)</label>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Varsayılan Arkaplan Rengi</label>
+                  <select
+                    value={editForm.defaultBgColor || 'default'}
+                    onChange={e => setEditForm({ ...editForm, defaultBgColor: e.target.value as 'default' | 'black' | 'white' })}
+                    className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="default">Varsayılan</option>
+                    <option value="black">Siyah</option>
+                    <option value="white">Beyaz</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -343,17 +523,28 @@ export default function Admin() {
 
               {editForm.variations.map((variation, idx) => (
                 <div key={idx} className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl bg-black/30 border border-white/5">
-                  <div className="w-full sm:w-32 h-32 sm:h-24 bg-black/50 rounded-lg overflow-hidden relative flex-shrink-0 border border-white/10">
+                  <div className={`w-full sm:w-48 ${editForm.isMulti ? 'aspect-[16/9]' : 'aspect-square'} rounded-lg overflow-hidden relative flex-shrink-0 border border-white/10`} style={{ backgroundColor: editForm.defaultBgColor === 'black' ? '#000' : editForm.defaultBgColor === 'white' ? '#fff' : '#111' }}>
                     {variation.image ? (
-                      <img src={variation.image} alt="Preview" className="w-full h-full object-cover" />
+                      <div className={`w-full h-full flex items-center justify-center ${editForm.isMulti ? 'p-4' : 'p-2'}`}>
+                        {variation.image.match(/\.(mp4|webm)$/i) ? (
+                          <video src={variation.image} className="w-full h-full object-contain pointer-events-none" autoPlay muted loop playsInline />
+                        ) : (
+                          <img
+                            src={variation.image}
+                            alt="Preview"
+                            style={{ transform: `scale(${variation.imageScale || 1})` }}
+                            className="w-full h-full object-contain"
+                          />
+                        )}
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500">
                         <ImageIcon size={24} />
                       </div>
                     )}
-                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 cursor-pointer transition-opacity">
-                      <span className="text-xs font-medium">Değiştir</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, idx)} />
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 cursor-pointer transition-opacity z-10">
+                      <span className="text-xs font-medium">Değiştir & Kırp</span>
+                      <input type="file" accept="image/*,video/mp4,video/webm" className="hidden" onChange={(e) => handleImageUpload(e, idx)} />
                     </label>
                   </div>
 
@@ -400,6 +591,10 @@ export default function Admin() {
                         </div>
                       </div>
                     )}
+
+                    <div className="text-xs text-gray-400 italic">
+                      Görsel boyutu yükleme esnasında ayarlanır. (Yeni yüklediğiniz görsellerde ölçek ayarlamanıza gerek yoktur.)
+                    </div>
                   </div>
 
                   {editForm.variations.length > 1 && (
@@ -428,9 +623,72 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Cropper Modal */}
+        {cropFileUrl && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4 sm:p-8">
+            <div className="flex justify-between items-center mb-4 max-w-4xl mx-auto w-full">
+              <h3 className="text-xl font-semibold">Görseli Ayarla</h3>
+              <button onClick={() => setCropFileUrl(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="relative flex-grow w-full max-w-4xl mx-auto rounded-2xl overflow-hidden bg-[#111] border border-white/10">
+              <Cropper
+                image={cropFileUrl}
+                crop={crop}
+                zoom={zoom}
+                minZoom={0.1}
+                maxZoom={3}
+                restrictPosition={false}
+                aspect={editForm?.isMulti ? 16 / 9 : 1}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+                objectFit="contain"
+                showGrid={true}
+              />
+            </div>
+
+            <div className="w-full max-w-4xl mx-auto mt-6 flex flex-col sm:flex-row gap-6 items-center justify-between">
+              <div className="flex items-center gap-4 w-full sm:w-96">
+                <span className="text-sm font-medium">Ölçek</span>
+                <input
+                  type="range"
+                  value={zoom}
+                  min={0.1}
+                  max={3}
+                  step={0.05}
+                  aria-labelledby="Zoom"
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                />
+              </div>
+              <p className="text-gray-400 text-sm hidden sm:block">Farenin tekerleğiyle veya kaydırıcı ile yaklaşabilirsiniz.</p>
+              <button
+                onClick={handleCropSave}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 w-full sm:w-auto justify-center"
+              >
+                {isUploading ? (
+                  <>Yükleniyor...</>
+                ) : (
+                  <>
+                    <Crop size={18} /> Kırp ve Yükle
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-4">
           {projects.map(project => (
-            <div key={project.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+            <div
+              key={project.id}
+              onClick={() => startEdit(project)}
+              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+            >
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 <div className="w-16 h-12 rounded bg-black/50 overflow-hidden flex-shrink-0">
                   {project.variations[0]?.image && (
@@ -444,14 +702,14 @@ export default function Admin() {
               </div>
               <div className="flex gap-2 self-end sm:self-auto">
                 <button
-                  onClick={() => startEdit(project)}
+                  onClick={(e) => { e.stopPropagation(); startEdit(project); }}
                   className="p-2 text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
                   aria-label="Düzenle"
                 >
                   <Edit2 size={18} />
                 </button>
                 <button
-                  onClick={() => handleDelete(project.id!)}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(project.id!); }}
                   className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                   aria-label="Sil"
                 >
@@ -466,6 +724,42 @@ export default function Admin() {
             </div>
           )}
         </div>
+
+        {/* Category Modal */}
+        {showCategoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-[#111] border border-white/10 p-6 rounded-2xl max-w-md w-full">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold">Kategori Yönetimi</h3>
+                <button onClick={() => setShowCategoryModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex gap-2 mb-6">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="Yeni kategori adı (Örn: Logo)"
+                  className="flex-grow bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
+                />
+                <button onClick={handleAddCategory} className="px-5 py-2 bg-purple-600 hover:bg-purple-700 transition-colors rounded-lg font-medium">Ekle</button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2">
+                {categories.map(c => (
+                  <div key={c.id} className="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-lg hover:bg-white/10 transition-colors">
+                    <span className="font-medium text-gray-200">{c.name}</span>
+                    <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-2 rounded-lg transition-colors">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                {categories.length === 0 && <span className="text-gray-500 text-sm italic block text-center">Henüz kategori eklenmemiş.</span>}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
