@@ -259,29 +259,29 @@ export default function Admin() {
           </div>
         )}
 
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold font-display">Portfolyo Yönetimi</h1>
-          <div className="flex gap-4">
-            <Link to="/" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+          <div className="flex flex-wrap gap-3">
+            <Link to="/" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-sm">
               Siteye Dön
             </Link>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+              className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm"
             >
               Çıkış Yap
             </button>
             <button
               onClick={startNew}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors text-sm"
             >
-              <Plus size={20} /> Yeni Ekle
+              <Plus size={18} /> Yeni Ekle
             </button>
           </div>
         </div>
 
         {editForm && (
-          <div className="mb-12 p-6 rounded-2xl bg-white/5 border border-white/10">
+          <div className="mb-12 p-4 sm:p-6 rounded-2xl bg-white/5 border border-white/10">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold">{editForm.id ? 'Projeyi Düzenle' : 'Yeni Proje'}</h2>
               <button onClick={() => { setEditingId(null); setEditForm(null); }} className="p-2 hover:bg-white/10 rounded-full">
@@ -342,8 +342,8 @@ export default function Admin() {
               </div>
 
               {editForm.variations.map((variation, idx) => (
-                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl bg-black/30 border border-white/5">
-                  <div className="w-32 h-24 bg-black/50 rounded-lg overflow-hidden relative flex-shrink-0 border border-white/10">
+                <div key={idx} className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl bg-black/30 border border-white/5">
+                  <div className="w-full sm:w-32 h-32 sm:h-24 bg-black/50 rounded-lg overflow-hidden relative flex-shrink-0 border border-white/10">
                     {variation.image ? (
                       <img src={variation.image} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
@@ -357,7 +357,7 @@ export default function Admin() {
                     </label>
                   </div>
 
-                  <div className="flex-grow space-y-4">
+                  <div className="flex-grow w-full space-y-4">
                     <div>
                       <label className="block text-xs text-gray-400 mb-1">Görsel URL (veya Dosya Yükle)</label>
                       <input
@@ -430,19 +430,19 @@ export default function Admin() {
 
         <div className="grid gap-4">
           {projects.map(project => (
-            <div key={project.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-12 rounded bg-black/50 overflow-hidden">
+            <div key={project.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <div className="w-16 h-12 rounded bg-black/50 overflow-hidden flex-shrink-0">
                   {project.variations[0]?.image && (
                     <img src={project.variations[0].image} alt="" className="w-full h-full object-cover" />
                   )}
                 </div>
-                <div>
-                  <h3 className="font-medium">{project.title}</h3>
-                  <span className="text-sm text-gray-400">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
+                <div className="overflow-hidden">
+                  <h3 className="font-medium truncate">{project.title}</h3>
+                  <span className="text-sm text-gray-400 block truncate">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-end sm:self-auto">
                 <button
                   onClick={() => startEdit(project)}
                   className="p-2 text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
