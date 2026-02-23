@@ -244,6 +244,18 @@ export default function App() {
     }
   }, [isDark]);
 
+  useEffect(() => {
+    if (selectedImage) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedImage]);
+
   const toggleTheme = () => setIsDark(!isDark);
 
   return (
