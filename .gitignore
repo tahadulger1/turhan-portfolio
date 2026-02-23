@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local Database Files
+*.db
+*.db-journal
+portfolio.db
+
+# Vercel & Uploads
+.vercel/
+uploads/
