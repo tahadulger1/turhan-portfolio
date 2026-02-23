@@ -116,6 +116,59 @@ const SingleProjectCard: React.FC<{ project: Project; onImageClick?: (url: strin
   );
 }
 
+const LoadingScreen = () => {
+  return (
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.8, ease: "easeInOut" }}
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#050505] text-white"
+    >
+      <div className="relative flex flex-col items-center">
+        <motion.div
+          className="flex overflow-hidden"
+          initial="hidden"
+          animate="visible"
+        >
+          {"EMİRHAN TURHAN".split("").map((char, index) => (
+            <motion.span
+              key={index}
+              variants={{
+                hidden: { y: 100, opacity: 0 },
+                visible: { y: 0, opacity: 1 }
+              }}
+              transition={{
+                duration: 0.8,
+                delay: index * 0.05,
+                ease: [0.33, 1, 0.68, 1]
+              }}
+              className={`font-display text-4xl md:text-6xl font-bold tracking-tighter ${char === " " ? "mr-4" : ""}`}
+            >
+              {char}
+            </motion.span>
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: "100%", opacity: 1 }}
+          transition={{ duration: 1, delay: 0.8, ease: "easeInOut" }}
+          className="h-[2px] bg-purple-600 mt-4 shadow-[0_0_15px_rgba(139,92,246,0.6)]"
+        />
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 1, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className="mt-8 text-xs tracking-[0.3em] uppercase text-gray-500 font-medium"
+        >
+          Portfolyo Yükleniyor
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function App() {
   const [isDark, setIsDark] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -138,7 +191,8 @@ export default function App() {
     } catch (error) {
       console.error('Failed to fetch projects', error);
     } finally {
-      setLoading(false);
+      // Yapay bir bekleme ekleyelim ki loading ekranı kullanıcıya bir anlık görünmesin, tadını çıkarsın
+      setTimeout(() => setLoading(false), 2000);
     }
   };
 
@@ -155,12 +209,11 @@ export default function App() {
   const multiProjects = projects.filter(p => p.isMulti);
   const singleProjects = projects.filter(p => !p.isMulti);
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-primary text-primary">Yükleniyor...</div>;
-  }
-
   return (
     <div className="min-h-screen">
+      <AnimatePresence>
+        {loading && <LoadingScreen key="loader" />}
+      </AnimatePresence>
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 glass-nav">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
