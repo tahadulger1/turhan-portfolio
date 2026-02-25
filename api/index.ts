@@ -98,6 +98,7 @@ app.get('/api/projects', async (req, res) => {
         const { data: projects, error: projectsError } = await supabase
             .from('projects')
             .select('*')
+            .order('sort_order', { ascending: true })
             .order('created_at', { ascending: false });
 
         if (projectsError) throw projectsError;
@@ -157,6 +158,30 @@ app.post('/api/projects', requireAuth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create project' });
+    }
+});
+
+app.put('/api/projects/reorder', requireAuth, async (req, res) => {
+    try {
+        const { orderedIds } = req.body;
+        if (!orderedIds || !Array.isArray(orderedIds)) {
+            return res.status(400).json({ error: 'orderedIds is required and must be an array' });
+        }
+
+        // Loop through the ordered IDs and update their sort_order sequentially
+        for (let i = 0; i < orderedIds.length; i++) {
+            const { error } = await supabase
+                .from('projects')
+                .update({ sort_order: i })
+                .eq('id', orderedIds[i]);
+
+            if (error) throw error;
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Reorder Error:", error);
+        res.status(500).json({ error: 'Failed to reorder projects' });
     }
 });
 

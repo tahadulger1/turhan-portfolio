@@ -1,5 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Image as ImageIcon, Lock, Eye, EyeOff, Crop } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Image as ImageIcon, Lock, Eye, EyeOff, Crop, Menu } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Link } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from './utils/cropImage';
@@ -20,7 +37,71 @@ type Project = {
   isMulti: boolean;
   defaultBgColor?: 'default' | 'black' | 'white';
   variations: ProjectVariation[];
+  sort_order?: number;
 };
+
+// Sortable Item Component
+function SortableProjectItem({ project, onEdit, onDelete }: { project: Project, onEdit: (p: Project) => void, onDelete: (id: number) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: project.id! });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.8 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors z-10"
+    >
+      <div className="flex items-center gap-4 w-full sm:w-auto">
+        <button
+          {...attributes}
+          {...listeners}
+          className="p-2 -ml-2 text-gray-400 hover:text-white cursor-grab active:cursor-grabbing touch-none outline-none"
+          aria-label="Sürükle bırak ile sırala"
+        >
+          <Menu size={20} />
+        </button>
+        <div className="w-16 h-12 rounded bg-black/50 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => onEdit(project)}>
+          {project.variations[0]?.image && (
+            <img src={project.variations[0].image} alt="" className="w-full h-full object-cover" />
+          )}
+        </div>
+        <div className="overflow-hidden cursor-pointer" onClick={() => onEdit(project)}>
+          <h3 className="font-medium truncate">{project.title}</h3>
+          <span className="text-sm text-gray-400 block truncate">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
+        </div>
+      </div>
+      <div className="flex gap-2 self-end sm:self-auto">
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+          className="p-2 text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
+          aria-label="Düzenle"
+        >
+          <Edit2 size={18} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(project.id!); }}
+          className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+          aria-label="Sil"
+        >
+          <Trash2 size={18} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Admin() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -43,6 +124,47 @@ export default function Admin() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Dnd sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = projects.findIndex((p) => p.id === active.id);
+      const newIndex = projects.findIndex((p) => p.id === over.id);
+
+      const newProjects = arrayMove(projects, oldIndex, newIndex);
+      setProjects(newProjects);
+
+      // Save order to backend
+      if (token) {
+        try {
+          const res = await fetch('/api/projects/reorder', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token
+            },
+            body: JSON.stringify({ orderedIds: newProjects.map(p => p.id) })
+          });
+          if (!res.ok) throw new Error('Sıralama güncellenemedi');
+          toast.success('Sıralama başarıyla kaydedildi');
+        } catch (error) {
+          console.error(error);
+          toast.error('Sıralama kaydedilemedi');
+          // Geri al
+          setProjects(projects);
+        }
+      }
+    }
+  };
 
   const showStatus = (text: string, type: 'success' | 'error') => {
     if (type === 'success') {
@@ -683,41 +805,25 @@ export default function Admin() {
         )}
 
         <div className="grid gap-4">
-          {projects.map(project => (
-            <div
-              key={project.id}
-              onClick={() => startEdit(project)}
-              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={projects.map(p => p.id!)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className="flex items-center gap-4 w-full sm:w-auto">
-                <div className="w-16 h-12 rounded bg-black/50 overflow-hidden flex-shrink-0">
-                  {project.variations[0]?.image && (
-                    <img src={project.variations[0].image} alt="" className="w-full h-full object-cover" />
-                  )}
-                </div>
-                <div className="overflow-hidden">
-                  <h3 className="font-medium truncate">{project.title}</h3>
-                  <span className="text-sm text-gray-400 block truncate">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
-                </div>
-              </div>
-              <div className="flex gap-2 self-end sm:self-auto">
-                <button
-                  onClick={(e) => { e.stopPropagation(); startEdit(project); }}
-                  className="p-2 text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
-                  aria-label="Düzenle"
-                >
-                  <Edit2 size={18} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(project.id!); }}
-                  className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                  aria-label="Sil"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
+              {projects.map(project => (
+                <SortableProjectItem
+                  key={project.id}
+                  project={project}
+                  onEdit={startEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           {projects.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               Henüz hiç proje eklenmemiş.
