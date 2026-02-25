@@ -10,11 +10,11 @@ const app = express();
 const storage = multer.memoryStorage();
 
 const fileFilter = (req: any, file: any, cb: any) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/webm'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml', 'video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'];
     if (allowedTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Desteklenmeyen dosya formatı. (Sadece resim ve mp4/webm videolar)'), false);
+        cb(new Error('Desteklenmeyen dosya formatı. Lütfen geçerli bir resim veya video (mp4, webm, mov) yükleyin.'), false);
     }
 };
 

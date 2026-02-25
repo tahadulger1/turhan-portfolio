@@ -666,7 +666,7 @@ export default function Admin() {
                     )}
                     <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 cursor-pointer transition-opacity z-10">
                       <span className="text-xs font-medium">Değiştir & Kırp</span>
-                      <input type="file" accept="image/*,video/mp4,video/webm" className="hidden" onChange={(e) => handleImageUpload(e, idx)} />
+                      <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-m4v" className="hidden" onChange={(e) => handleImageUpload(e, idx)} />
                     </label>
                   </div>
 
