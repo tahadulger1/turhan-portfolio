@@ -62,28 +62,28 @@ function SortableProjectItem({ project, onEdit, onDelete }: { project: Project, 
     <div
       ref={setNodeRef}
       style={style}
-      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors z-10"
+      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors z-10 w-full overflow-hidden box-border"
     >
-      <div className="flex items-center gap-4 w-full sm:w-auto">
+      <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto overflow-hidden min-w-0">
         <button
           {...attributes}
           {...listeners}
-          className="p-2 -ml-2 text-gray-400 hover:text-white cursor-grab active:cursor-grabbing touch-none outline-none"
+          className="p-1 sm:p-2 -ml-1 sm:-ml-2 text-gray-400 hover:text-white flex-shrink-0 cursor-grab active:cursor-grabbing touch-none outline-none"
           aria-label="Sürükle bırak ile sırala"
         >
           <Menu size={20} />
         </button>
-        <div className="w-16 h-12 rounded bg-black/50 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => onEdit(project)}>
+        <div className="w-14 sm:w-16 h-10 sm:h-12 rounded bg-black/50 overflow-hidden flex-shrink-0 cursor-pointer" onClick={() => onEdit(project)}>
           {project.variations[0]?.image && (
             <img src={project.variations[0].image} alt="" className="w-full h-full object-cover" />
           )}
         </div>
-        <div className="overflow-hidden cursor-pointer" onClick={() => onEdit(project)}>
-          <h3 className="font-medium truncate">{project.title}</h3>
-          <span className="text-sm text-gray-400 block truncate">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
+        <div className="overflow-hidden cursor-pointer flex-grow min-w-0" onClick={() => onEdit(project)}>
+          <h3 className="font-medium truncate text-sm sm:text-base">{project.title}</h3>
+          <span className="text-xs sm:text-sm text-gray-400 block truncate">{project.category} • {project.isMulti ? `${project.variations.length} Varyasyon` : 'Tekil'}</span>
         </div>
       </div>
-      <div className="flex gap-2 self-end sm:self-auto">
+      <div className="flex gap-2 self-end sm:self-auto flex-shrink-0">
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(project); }}
           className="p-2 text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
@@ -463,8 +463,8 @@ export default function Admin() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-md p-8 rounded-2xl bg-white/5 border border-white/10">
+      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-4 sm:p-6 overflow-x-hidden">
+        <div className="w-full max-w-md p-6 sm:p-8 rounded-2xl bg-white/5 border border-white/10">
           <div className="flex justify-center mb-6">
             <div className="p-4 rounded-full bg-purple-500/20 text-purple-400">
               <Lock size={32} />
@@ -524,7 +524,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-8">
+    <div className="min-h-screen bg-[#050505] text-white p-4 sm:p-8 overflow-x-hidden w-full">
       <Toaster
         position="top-center"
         toastOptions={{
@@ -535,7 +535,7 @@ export default function Admin() {
           }
         }}
       />
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto w-full">
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-3xl font-bold font-display">Portfolyo Yönetimi</h1>
